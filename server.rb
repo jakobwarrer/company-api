@@ -2,16 +2,17 @@
 require 'sinatra'
 require "sinatra/namespace"
 require 'mongoid'
-before do
-   content_type :json    
-   headers 'Access-Control-Allow-Origin' => '*', 
-            'Access-Control-Allow-Methods' => ['OPTIONS', 'GET', 'POST', 'DELETE', 'PATCH']  
-end
+require "sinatra/cors"
 
-set :protection, false
+
+set :allow_origin, "*"
+set :allow_methods, "GET,HEAD,POST,DELETE,OPTIONS"
+set :allow_headers, "content-type,if-modified-since"
+set :expose_headers, "location,link"
 
 # DB Setup
 Mongoid.load!("mongoid.config", :development)
+
 
 # Models
 class Company
@@ -29,7 +30,7 @@ class Company
   validates :address, presence: true
   validates :city, presence: true
   validates :country, presence: true
-  validates :phone_number, presence: true
+  validates :phone_number, presence: false
 
   index({ cvr: 1 }, { unique: true, name: "cvr_index" })
   index({ company_name: 'text' })
@@ -40,11 +41,12 @@ class Company
   scope :city, -> (city) { where(city: city) }
   scope :country, -> (country) { where(country: country) }
   scope :phone_number, -> (phone_number) { where(phone_number: phone_number) }
+
 end
 
 # Serializers
 class CompanySerializer
-  
+
   def initialize(company)
     @company = company
   end
@@ -119,10 +121,14 @@ namespace '/api/v1' do
   end
 
   post '/companies' do
-    company = Company.new(json_params)
-    halt 422, serialize(company) unless company.save
-    response.headers['Location'] = "#{base_url}/api/v1/companies/#{company.id}"
-    status 201
+    begin
+      company = Company.new(json_params)
+      halt 422, serialize(company) unless company.save
+      response.headers['Location'] = "#{base_url}/api/v1/companies/#{company.id}"
+      status 201
+    rescue Mongo::Error::OperationFailure
+      status 500
+    end
   end
 
   patch '/companies/:id' do |id|
@@ -135,5 +141,5 @@ namespace '/api/v1' do
     company.destroy if company
     status 204
   end
-
+  
 end
