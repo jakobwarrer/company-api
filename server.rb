@@ -124,7 +124,6 @@ namespace '/api/v1' do
 
   #Create new company
   post '/companies' do
-    begin
       company = Company.new(json_params)
       halt 422, serialize(company) unless company.save
       response.headers['Location'] = "#{base_url}/api/v1/companies/#{company.id}"
