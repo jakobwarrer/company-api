@@ -1,8 +1,9 @@
 # server.rb
 require 'sinatra'
 require "sinatra/namespace"
-require 'mongoid'
 require "sinatra/cors"
+
+require 'mongoid'
 
 
 set :allow_origin, "*"
@@ -10,11 +11,10 @@ set :allow_methods, "GET,HEAD,POST,DELETE,OPTIONS"
 set :allow_headers, "content-type,if-modified-since"
 set :expose_headers, "location,link"
 
-# DB Setup
+# MongoDB
 Mongoid.load!("mongoid.config", :development)
 
-
-# Models
+# Company model
 class Company
   include Mongoid::Document
 
@@ -37,14 +37,14 @@ class Company
 
   scope :cvr, -> (cvr) { where(cvr: cvr) }
   scope :company_name, -> (company_name) { where(company_name: /^#{company_name}/) }
-  scope :address, -> (address) { where(address: address) }
-  scope :city, -> (city) { where(city: city) }
-  scope :country, -> (country) { where(country: country) }
-  scope :phone_number, -> (phone_number) { where(phone_number: phone_number) }
+  scope :address, -> (address) { where(address: /^#{address}/) }
+  scope :city, -> (city) { where(city: /^#{city}/) }
+  scope :country, -> (country) { where(country: /^#{country}/) }
+  scope :phone_number, -> (phone_number) { where(phone_number: /^#{phone_number}/) }
 
 end
 
-# Serializers
+
 class CompanySerializer
 
   def initialize(company)
@@ -68,9 +68,9 @@ class CompanySerializer
 end
 
 
-# Endpoints
+# Start Endpoints
 get '/' do
-  'Welcome to CompanyList!'
+  'Hi, i am a company api'
 end
 
 namespace '/api/v1' do
@@ -105,6 +105,7 @@ namespace '/api/v1' do
     end
   end
 
+  #Search all companies
   get '/companies' do
     companies = Company.all
 
@@ -115,28 +116,29 @@ namespace '/api/v1' do
     companies.map { |company| CompanySerializer.new(company) }.to_json
   end
 
+  #Get company by ID
   get '/companies/:id' do |id|
     halt_if_not_found!
     serialize(company)
   end
 
+  #Create new company
   post '/companies' do
     begin
       company = Company.new(json_params)
       halt 422, serialize(company) unless company.save
       response.headers['Location'] = "#{base_url}/api/v1/companies/#{company.id}"
       status 201
-    rescue Mongo::Error::OperationFailure
-      status 500
-    end
   end
 
+  #Edit company
   patch '/companies/:id' do |id|
     halt_if_not_found!
     halt 422, serialize(company) unless company.update_attributes(json_params)
     serialize(company)
   end
 
+  #Delete company
   delete '/companies/:id' do |id|
     company.destroy if company
     status 204
